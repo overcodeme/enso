@@ -193,5 +193,11 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-# All data folder
-data/
+# mails folder
+data/emails.txt
+
+# Proxies folder
+data/proxies.txt
+
+# Private keys folder
+data/wallets.txt

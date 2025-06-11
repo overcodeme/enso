@@ -1,6 +1,6 @@
 from utils.utils import sign_message, get_auth_nonce
 from utils.logger import logger
-from data.const import ensoHeaders
+from data.const import enso_headers
 import aiohttp
 from eth_account import Account
 from datetime import datetime, timezone
@@ -10,7 +10,7 @@ class EnsoClient:
     def __init__(self, private_key, proxy):
         self.wallet = Account.from_key(private_key)
         self.session = aiohttp.ClientSession(proxy=proxy)
-        self.headers = ensoHeaders
+        self.headers = enso_headers
         self.token = None
         
 
@@ -27,13 +27,13 @@ class EnsoClient:
         try:
             async with self.session.post(url=url, json=data, headers=self.headers) as response:
                 if response.status == 200:
-                    logger.success(self.wallet.address, 'Successfully logged in')
+                    logger.success(f'{self.wallet.address} | Successfully logged in')
                 else:
                     data = await response.text()
-                    logger.error(self.wallet.address, f'Login error: {data}')
+                    logger.error(f'{self.wallet.address} | Login error: {data}')
 
         except Exception as e:
-            logger.error(self.wallet.address, f'An error occurred: {e}')
+            logger.error(f'{self.wallet.address} | An error occurred: {e}')
 
 
 
