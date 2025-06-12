@@ -1,8 +1,8 @@
 from utils.logger import logger
 from utils.file_manager import load_yaml
 from utils.captcha import anticaptcha_solve_captcha
-from utils.utils import get_last_unread_message
-from data.const import zealy_headers
+from utils.utils import get_last_unread_message, generate_random_nickname
+from data.const import zealy_headers, enso_headers
 from anticaptchaofficial.recaptchav2proxyless import *
 import aiohttp
 import asyncio
@@ -23,8 +23,14 @@ async def register_or_login_zealy(session: aiohttp.ClientSession, mail: str):
 
             if not session_data.isExist:
                 logger.info(f'{login} | Creating zealy user')
-                zealy_session = 
+                zealy_session = await create_zealy_user(session, mail, session_data.session)
+                session_data.session = zealy_session
+            else:
+                logger.warning(f'{login} | Zealy user already exists')
 
+            return session_data
+        except Exception as e:
+            logger.error(f'{login} | An error occurred while login/registering zealy account: {e}')
 
 
 async def send_confirmation_code(session: aiohttp.ClientSession, mail: str):
@@ -78,3 +84,49 @@ async def verify_otp_code(session: aiohttp.ClientSession, mail: str, code):
 
 async def create_zealy_user(session: aiohttp.ClientSession, mail: str, cookie):
     login, password = mail.split(':')
+    url = 'https://api-v2.zealy.io/api/users/v2'
+    random_word = await generate_random_nickname()
+    try:
+        data = {
+            'name': random_word,
+            'utm': {}
+        }
+        async with session.post(url=url, headers=zealy_headers, json=data, cookies=cookie) as response:
+            return response.headers['set-cookie']
+    except Exception as e:
+        logger.error(f'{login} | An error occurred while creating zealy user: {e}')
+
+
+async def get_redirect_link(session: aiohttp.ClientSession, cookies):
+    url = 'https://api-v2.zealy.io/api/communities/enso/quests/27c7d639-ef02-491d-9dba-d070cfd6b794/task/a3d822ff-98fe-4ae3-bfec-60dc9abc0810/generate_redirect_url'
+    try:
+        headers = {
+            **zealy_headers,
+            'cookie': '; '.join(cookies)
+        }
+
+        async with session.post(url=url, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data['redirectUrl']
+            else:
+                logger.error(f'Error while gettings redirect url: {await response.text()}')
+    except Exception as e:
+        logger.error(f'An error occurred while getting redirect link: {e}')
+
+
+async def get_enso_user(session: aiohttp.ClientSession, user_id, wallet_address):
+    url = f'https://speedrun.enso.build/api/zealy/user/{user_id}'
+    try:
+        async with session.get(url=url, headers=enso_headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data
+            else:
+                logger.error(f'{wallet_address} | Error while getting enso user data: {await response.text()}')
+    except Exception as e:
+        logger.error(f'{wallet_address} | An error occurred whil getting enso user data: {e}')
+
+
+async def handle_zealy_connect(session: aiohttp.ClientSession, wallet_address, mail):
+    

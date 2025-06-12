@@ -1,14 +1,18 @@
 from eth_account.messages import encode_defunct
-from utils.file_manager import load_yaml
+from utils.file_manager import load_yaml, load_txt
 from utils.logger import logger
 import imaplib
 import email
 from email.header import decode_header
 import aiohttp
+import random
+import string
+import uuid
 
 
 settings = load_yaml('settings.yaml')
 ATTEMPTS = settings['ATEMPTS']
+words = load_txt('data/engwords.txt')
 
 async def sign_message(wallet, message):
     encoded_message = encode_defunct(text=message)
@@ -82,5 +86,17 @@ async def get_imap_mail(mail: str):
             logger.error(f'{login} | An error occurred while fetching mail: {e}')
 
 
-async def get_random_nickname():
-    
+async def generate_random_word(session: aiohttp.ClientSession):
+    url = "https://random-word-api.vercel.app/api?words=2"
+    try:
+        async with session.get(url=url) as response:
+            data = await response.json()
+            return data
+    except Exception as e:
+        logger.error(f'Error while getting random word: {e}')
+
+
+async def generate_random_nickname():
+    random_word = random.choice(words)
+    random_number = ''.join(str(random.randint(0, 9)) for _ in range(random.randint(4, 8)))
+    return f'{random_word}{random_number}'
