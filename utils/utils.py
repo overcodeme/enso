@@ -1,4 +1,6 @@
 from eth_account.messages import encode_defunct
+import string
+import random
 from utils.file_manager import load_yaml, load_txt
 from utils.logger import logger
 from data.const import enso_headers
@@ -22,14 +24,13 @@ async def get_auth_nonce(session: aiohttp.ClientSession, headers):
             return data['nonce']
 
 
-async def generate_random_word(session: aiohttp.ClientSession):
-    url = "https://random-word-api.vercel.app/api?words=2"
-    try:
-        async with session.get(url=url) as response:
-            data = await response.json()
-            return data
-    except Exception as e:
-        logger.error(f'Error while getting random word: {e}')
+async def generate_random_defi_name():
+    word_length = random.randint(10, 32)
+    characters = string.ascii_letters + string.digits
+    word = ''
+    for _ in word_length:
+        word += random.choice(characters)
+    return word
 
 
 async def get_custom_token(session: aiohttp.ClientSession, wallet):

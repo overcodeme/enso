@@ -12,7 +12,7 @@ class EnsoClient:
         self.wallet = Account.from_key(private_key)
         self.session = aiohttp.ClientSession(proxy=proxy)
         self.headers = enso_headers
-        self.custom_token = None
+        self.token = None
         self.zealy_id = zealy_id
         
 
@@ -24,6 +24,7 @@ class EnsoClient:
             verify_data = await verify_custom_token_response(self.session, self.wallet.address, custom_token)
             if not verify_data: raise Exception("Can't get verify data")
 
+            self.token = verify_data['idToken']
             account_info = await get_account_info_response(self.session, verify_data['idToken'], self.wallet.address)
             enso_user = await self.get_user_data()
             print(self.zealy_id)
