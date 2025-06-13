@@ -200,4 +200,4 @@ data/emails.txt
 data/proxies.txt
 
 # Private keys folder
-data/wallets.txt
+data/private_keys.txt

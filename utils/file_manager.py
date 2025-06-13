@@ -20,7 +20,7 @@ def load_json(file_path):
             pass
     else:
         with open(file_path) as file:
-            data = json.load()
+            data = json.load(file)
             return data
         
 

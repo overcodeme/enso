@@ -1,18 +1,12 @@
 from eth_account.messages import encode_defunct
 from utils.file_manager import load_yaml, load_txt
 from utils.logger import logger
-import imaplib
-import email
-from email.header import decode_header
+from data.const import enso_headers
+from datetime import datetime, timezone
 import aiohttp
-import random
-import string
-import uuid
 
 
 settings = load_yaml('settings.yaml')
-ATTEMPTS = settings['ATEMPTS']
-words = load_txt('data/engwords.txt')
 
 async def sign_message(wallet, message):
     encoded_message = encode_defunct(text=message)
@@ -26,64 +20,6 @@ async def get_auth_nonce(session: aiohttp.ClientSession, headers):
         if response.status == 200:
             data = await response.json()
             return data['nonce']
-        
-
-async def get_imap_server(mail_login: str):
-    domain = mail_login.split('@')[1]
-    if domain in ['ro.ru', 'rambler.ru', 'myrambler.ru', 'autorambler.ru']: return 'imap.rambler.ru'
-    elif domain == 'gmail.com': return 'imap.gmail.com'
-    elif domain == 'outlook.com': return 'imap-mail.outlook.com'
-    elif domain == 'mail.ru': return 'imap.mail.ru'
-    else: return 'imap.firstmail.ltd'
-
-
-async def get_last_unread_message(session: aiohttp.ClientSession, mail: str):
-    login, password = mail.split(':')
-    for _ in range(ATTEMPTS):
-        try:
-            logger.info(f'{login} | Waiting Zealy otp code')
-            if get_imap_server(login) == 'imap.firstmail.ltd':
-                url = f'https://api.firstmail.ltd/v1/market/get/message?username={login}&password={password}'
-                headers = {
-                    'X-API-KEY': 'bed88ac4-9ce8-4d94-af15-4c879c583d68'
-                }
-                async with session.get(url=url, headers=headers) as response:
-                    response_data = await response.json()  
-                    if response_data.get('has_message') and 'Zealy' in response_data.get('subject', ''):
-                        return response_data['subject'].split('is')[1].strip()
-            else:
-                code = await get_imap_mail(session, mail)
-                return code
-        except Exception as e:
-            logger.error(f'{mail} | An error occurred: {e}')
-
-
-async def get_imap_mail(mail: str):
-    login, password = mail.split(':')
-    for _ in range(ATTEMPTS):
-        try:
-            imap_server = await get_imap_server(login)
-            mail = imaplib.IMAP4_SSL(imap_server)
-            mail.login(login, password)
-            mail.select('inbox')
-            status, messages = mail.search(None, 'ALL')
-            mail_ids = messages[0].split()
-
-            latest_emails = mail_ids['-5:']
-
-            for mail_id in latest_emails:
-                status, msg_data = mail.fetch(mail_id, '(RFC822)')
-                msg = email.message_from_bytes(msg_data[0][1])
-                subject, encoding = decode_header(msg['Subject'])[0]
-
-                if isinstance(subject, bytes):
-                    subject = subject.decode(encoding if encoding else 'utf-8')
-                
-                if 'Zealy' in subject:
-                    return subject.split('is')[1].strip()
-                
-        except Exception as e:
-            logger.error(f'{login} | An error occurred while fetching mail: {e}')
 
 
 async def generate_random_word(session: aiohttp.ClientSession):
@@ -96,7 +32,47 @@ async def generate_random_word(session: aiohttp.ClientSession):
         logger.error(f'Error while getting random word: {e}')
 
 
-async def generate_random_nickname():
-    random_word = random.choice(words)
-    random_number = ''.join(str(random.randint(0, 9)) for _ in range(random.randint(4, 8)))
-    return f'{random_word}{random_number}'
+async def get_custom_token(session: aiohttp.ClientSession, wallet):
+    nonce = await get_auth_nonce(session, enso_headers)
+    message = f'speedrun.enso.build wants you to sign in with your Ethereum account:\n{wallet.address}\n\nSign in with Ethereum to the app.\n\nURI: https://speedrun.enso.build\nVersion: 1\nChain ID: 1\nNonce: {nonce}\nIssued At: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3]}Z'
+    signature = await sign_message(wallet, message)
+    url = 'https://speedrun.enso.build/api/firebase-custom-token'
+
+    data = {
+        'message': message,
+        'signature': signature
+    }
+
+    try:
+        async with session.post(url=url, json=data, headers=enso_headers) as response:
+            data = await response.json()
+            return data['customToken']
+    except Exception as e:
+        logger.error(f'{wallet.address} | An error occurred while getting custom token: {e}')
+
+
+async def verify_custom_token_response(session: aiohttp.ClientSession, wallet_address, custom_token):
+    url = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=AIzaSyB0WVedFIoRpOwzoAOkgzlr2Y_R3I_j4fk'
+    try:
+        data = {
+            'token': custom_token,
+            'returnSecureToken': True
+        }
+        async with session.post(url=url, headers=enso_headers, json=data) as response:
+            data = await response.json()
+            return data
+    except Exception as e:
+        logger.error(f'{wallet_address} | An error occurred while verifying custom tokne: {e}')
+
+
+async def get_account_info_response(session:aiohttp.ClientSession, id_token, wallet_address):
+    url = 'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyB0WVedFIoRpOwzoAOkgzlr2Y_R3I_j4fk'
+    try:
+        data = {
+            'idToken': id_token
+        }
+        async with session.post(url=url, headers=enso_headers, json=data) as response:
+            data = await response.json()
+            return data
+    except Exception as e:
+        logger.error(f'{wallet_address} | An error occurred whil getting account info response: {e}')
