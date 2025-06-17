@@ -2,6 +2,7 @@ import asyncio
 import random
 from utils.file_manager import load_txt, load_json, load_yaml
 from utils.logger import logger
+from utils.utils import generate_random_sleep
 from colorama import Fore, Style
 from enso_client import EnsoClient
 
@@ -11,16 +12,16 @@ proxies = load_txt('data/proxies.txt')
 settings = load_yaml('settings.yaml')
 db = load_json('data/db.json')
 zealy_data = [wallet['zealyUserId'] for wallet in db.values()]
-SLEEP_BETWEEN = settings['SLEEP_BETWEEN']
 
 async def handle_wallet(private_key, proxy, zealy_id):
     enso = EnsoClient(private_key, proxy, zealy_id)
     try:
-        # random_sleep = random.randint(SLEEP_BETWEEN[0], SLEEP_BETWEEN[1])
+        # random_sleep = await generate_random_sleep()
         # logger.info(f'{enso.wallet.address} | Sleeping before wallet handling for {random_sleep} sec...')
         # await asyncio.sleep(random_sleep)
 
         await enso.login()
+        await enso.handle_creating_defi_dex_tasks()
     except Exception as e:
         logger.error(f'{enso.wallet.address} | An error occurred while account processing: {e}')
     finally:

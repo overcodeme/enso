@@ -1,10 +1,12 @@
 import aiohttp
+import asyncio
 from utils.logger import logger
-from utils.utils import generate_random_defi_name
+from utils.utils import generate_random_defi_name, generate_random_sleep
 
 
 async def create_defi_dex(session: aiohttp.ClientSession, wallet_address, headers, zealy_id):
     url = 'https://speedrun.enso.build/api/track-project-creation'
+    random_sleep = await generate_random_sleep()
     try:
         dex_name = await generate_random_defi_name()
         logger.info(f'{wallet_address} | Creating dex "{dex_name}"...')
@@ -21,3 +23,5 @@ async def create_defi_dex(session: aiohttp.ClientSession, wallet_address, header
                 logger.error(f"{wallet_address} | Can't create defi dex: {await response.text()}")
     except Exception as e:
         logger.error(f'{wallet_address} | An error occurred while creating defi dex: {e}')
+    finally:
+        await asyncio.sleep(random_sleep)

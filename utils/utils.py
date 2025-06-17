@@ -5,6 +5,7 @@ from utils.file_manager import load_yaml, load_txt
 from utils.logger import logger
 from data.const import enso_headers
 from datetime import datetime, timezone
+import asyncio
 import aiohttp
 
 
@@ -28,7 +29,7 @@ async def generate_random_defi_name():
     word_length = random.randint(10, 32)
     characters = string.ascii_letters + string.digits
     word = ''
-    for _ in word_length:
+    for _ in range(word_length):
         word += random.choice(characters)
     return word
 
@@ -77,3 +78,34 @@ async def get_account_info_response(session:aiohttp.ClientSession, id_token, wal
             return data
     except Exception as e:
         logger.error(f'{wallet_address} | An error occurred whil getting account info response: {e}')
+
+
+async def solve_hcaptcha():
+    session = aiohttp.ClientSession()
+    solve_request_id = ''
+    create_captcha_task_url = f'http://api.solvecaptcha.com/in.php?key={settings['SOLVECAPTCHA_KEY']}&method=hcaptcha&sitekey=d3c47d2e-57b8-45f6-a102-03309a9ecb92&pageurl=https://speedrun.enso.build/'
+    try:
+        async with session.post(url=create_captcha_task_url) as response:
+            data = await response.text()
+            solve_request_id = data.split('|')[1]
+            logger.info('Waiting for captcha solver results...')
+            await asyncio.sleep(random.randint(20, 30))
+            
+            checking_result_url = f'http://api.solvecaptcha.com/res.php?key={settings['SOLVECAPTCHA_KEY']}&action=get&id={solve_request_id}'
+            while True:
+                async with session.get(url=checking_result_url) as response:
+                    data = await response.text()
+                    if 'CAPCHA_NOT_READY' in data:
+                        logger.info('Captcha not ready yet')
+                        await asyncio.sleep(random.randint(20, 30))
+                    else:
+                        print(data)
+                        break
+
+    except Exception as e:
+        logger.error(f'Error while solving hcaptcha: {e}')
+
+
+async def generate_random_sleep():
+    sleep_from, sleep_to = settings['SLEEP_DURATION']
+    return random.randint(sleep_from, sleep_to)
